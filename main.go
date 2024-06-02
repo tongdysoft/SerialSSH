@@ -4,35 +4,66 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
+	"sync"
+	"time"
 
 	"github.com/gliderlabs/ssh"
 	"github.com/tarm/serial"
 )
 
+var serialPort *serial.Port
+var serialMu sync.Mutex
+
 func handleConnection(sshSession ssh.Session) {
-	// 配置串口
-	c := &serial.Config{Name: "/dev/ttyUSB0", Baud: 9600}
-	s, err := serial.OpenPort(c)
-	if err != nil {
-		fmt.Fprintln(sshSession, "Failed to open serial port:", err)
+	serialMu.Lock()
+	defer serialMu.Unlock()
+	if serialPort == nil {
+		fmt.Fprintln(sshSession, "Serial port not initialized")
 		return
 	}
-	defer s.Close()
 
-	// 创建双向管道
+	// 从SSH会话到串口，同时输出到本地
 	go func() {
-		_, err := io.Copy(s, sshSession) // 从SSH会话到串口
+		multiWriter := io.MultiWriter(serialPort, os.Stdout)
+		_, err := io.Copy(multiWriter, sshSession)
 		if err != nil {
 			log.Println("Error copying from SSH to serial:", err)
 		}
 	}()
-	_, err = io.Copy(sshSession, s) // 从串口到SSH会话
+
+	// 从串口到SSH会话，同时输出到本地
+	multiWriter := io.MultiWriter(sshSession, os.Stdout)
+	_, err := io.Copy(multiWriter, serialPort)
 	if err != nil {
 		log.Println("Error copying from serial to SSH:", err)
 	}
 }
 
+func readSerialPort() {
+	c := &serial.Config{Name: "COM3", Baud: 9600} // 还不支持参数，先修改为你的串口号
+	var err error
+	serialPort, err = serial.OpenPort(c)
+	if err != nil {
+		log.Fatalf("Failed to open serial port: %v", err)
+	}
+	defer serialPort.Close()
+
+	buf := make([]byte, 128)
+	for {
+		n, err := serialPort.Read(buf)
+		if err != nil {
+			log.Printf("Error reading from serial port: %v", err)
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		fmt.Println(string(buf[:n]))
+	}
+}
+
 func main() {
+	go readSerialPort()
+
 	ssh.Handle(handleConnection)
 
 	log.Println("Starting SSH server on port 2222...")
