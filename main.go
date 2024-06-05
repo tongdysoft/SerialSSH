@@ -42,16 +42,22 @@ func handleConnection(sshSession ssh.Session) {
 func main() {
 	go readSerialPort()
 
-	privateKey, err := loadOrGenerateSSHKey("host.key.pem")
+	privateKey, err := loadOrGenerateSSHKey("server.pem")
 	if err != nil {
 		log.Fatalf("Failed to load or generate private key: %v", err)
 	}
 
+	authorizedKey, err = loadAuthorizedKey("client.pub")
+	if err != nil {
+		log.Fatalf("Failed to load authorized public key: %v", err)
+	}
+
 	server := ssh.Server{
-		Addr:            ":2222",
-		HostSigners:     []ssh.Signer{privateKey},
-		Handler:         handleConnection,
-		PasswordHandler: passwordHandler,
+		Addr:             ":2222",
+		HostSigners:      []ssh.Signer{privateKey},
+		Handler:          handleConnection,
+		PublicKeyHandler: publicKeyAuthHandler,
+		// PasswordHandler:  passwordHandler,
 	}
 
 	log.Println("Starting SSH server on port 2222...")
