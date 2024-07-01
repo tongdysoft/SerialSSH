@@ -17,12 +17,12 @@ import (
 func generateRSA4096Key(filename string) error {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
-		return fmt.Errorf("failed to generate private key: %v", err)
+		return fmt.Errorf("%s (RSA %s): %v", l("HOSTKEYGENERR"), filename, err)
 	}
 
 	privateKeyFile, err := os.Create(filename)
 	if err != nil {
-		return fmt.Errorf("failed to create private key file: %v", err)
+		return fmt.Errorf("%s (RSA %s): %v", l("HOSTKEYGENERR"), filename, err)
 	}
 	defer privateKeyFile.Close()
 
@@ -31,7 +31,7 @@ func generateRSA4096Key(filename string) error {
 		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
 	}
 	if err := pem.Encode(privateKeyFile, privateKeyPEM); err != nil {
-		return fmt.Errorf("failed to write private key to file: %v", err)
+		return fmt.Errorf("%s (RSA %s): %v", l("HOSTKEYGENERR"), filename, err)
 	}
 
 	return nil
@@ -40,18 +40,18 @@ func generateRSA4096Key(filename string) error {
 func generateECDSAKey(filename string) error {
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
-		return fmt.Errorf("failed to generate ECDSA private key: %v", err)
+		return fmt.Errorf("%s (ECDSA %s): %v", l("HOSTKEYGENERR"), filename, err)
 	}
 
 	privateKeyFile, err := os.Create(filename)
 	if err != nil {
-		return fmt.Errorf("failed to create private key file: %v", err)
+		return fmt.Errorf("%s (ECDSA %s): %v", l("HOSTKEYGENERR"), filename, err)
 	}
 	defer privateKeyFile.Close()
 
 	privateKeyBytes, err := x509.MarshalECPrivateKey(privateKey)
 	if err != nil {
-		return fmt.Errorf("failed to marshal ECDSA private key: %v", err)
+		return fmt.Errorf("%s (ECDSA %s): %v", l("HOSTKEYGENERR"), filename, err)
 	}
 
 	privateKeyPEM := &pem.Block{
@@ -59,7 +59,7 @@ func generateECDSAKey(filename string) error {
 		Bytes: privateKeyBytes,
 	}
 	if err := pem.Encode(privateKeyFile, privateKeyPEM); err != nil {
-		return fmt.Errorf("failed to write private key to file: %v", err)
+		return fmt.Errorf("%s (ECDSA %s): %v", l("HOSTKEYGENERR"), filename, err)
 	}
 
 	return nil
@@ -67,7 +67,7 @@ func generateECDSAKey(filename string) error {
 
 func loadOrGenerateSSHKey(filename string) (gossh.Signer, error) {
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
-		log.Println("Private key file not found, generating a new one...")
+		log.Println(l("GENNEWKEY"), filename)
 		if err := generateECDSAKey(filename); err != nil {
 			return nil, err
 		}
@@ -75,12 +75,12 @@ func loadOrGenerateSSHKey(filename string) (gossh.Signer, error) {
 
 	privateBytes, err := os.ReadFile(filename)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load private key: %v", err)
+		return nil, fmt.Errorf("%s: %v", l("PRIKEYLOADERR"), err)
 	}
 
 	private, err := gossh.ParsePrivateKey(privateBytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse private key: %v", err)
+		return nil, fmt.Errorf("%s: %v", l("PRIKEYPARSEERR"), err)
 	}
 
 	return private, nil

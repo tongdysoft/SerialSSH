@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"os"
 
 	"github.com/gliderlabs/ssh"
@@ -24,11 +25,15 @@ func loadAuthorizedKey(filename string) (gossh.PublicKey, error) {
 }
 
 func passwordHandler(ctx ssh.Context, password string) bool {
-	return ctx.User() == "yashi" && password == "123456"
+	var isOK bool = ctx.User() == "yashi" && password == "123456"
+	log.Println(ctx.RemoteAddr(), l("AUTH"), l("PWD"), isOK)
+	return isOK
 }
 
 func publicKeyAuthHandler(ctx ssh.Context, key ssh.PublicKey) bool {
-	return keysEqual(key, authorizedKey)
+	var isOK bool = keysEqual(key, authorizedKey)
+	log.Println(ctx.RemoteAddr(), l("AUTH"), l("CERT"), isOK)
+	return isOK
 }
 
 func keysEqual(a, b gossh.PublicKey) bool {
